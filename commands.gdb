@@ -3,26 +3,12 @@ si
 si
 si
 si
-b *0x80000086
+si
+b * 0x80000086
 c
 u 58
-s
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
-n
+si
+u 29
 s
 n
 n
@@ -36,45 +22,23 @@ fin
 b main.c:42
 c
 s
-nn
+u 431
 n
 n
-n
-n
-n
-n
-n
-n
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
 si
 si
 si
 si
 si 10
-si
-si
-si
-si
+si 10
+si 10
 n
 n
 n
 n
 n
 s
+n
 u 112
 si
 si
@@ -103,7 +67,10 @@ si
 si
 si
 si
-si 5
+si
+si 10
+si 9
+si 10
 si
 si
 si
@@ -114,30 +81,7 @@ si
 si
 si
 si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
-si
+u 40
 n
 n
 n
@@ -146,12 +90,7 @@ n
 n
 n
 n
-n
-n
-n
-n
-n
-n
+s
 s
 n
 p p->name
@@ -160,18 +99,18 @@ si
 si
 si
 si
+si
+si
+si
+si
+si
+si
+si
+si
+si
 si 10
 si 10
 si 10
-si
-si
-si
-si
-si
-si
-si
-si
-si
 si
 si
 si
@@ -184,7 +123,4 @@ n
 n
 n
 n
-n
-n
-n
-q
+
