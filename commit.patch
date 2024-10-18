@@ -1,0 +1,346 @@
+diff --git a/Makefile b/Makefile
+index b971308..1f68a81 100644
+--- a/Makefile
++++ b/Makefile
+@@ -157,6 +157,9 @@ UPROGS=\
+ 	$U/_grind\
+ 	$U/_wc\
+ 	$U/_zombie\
++	$U/_sleep\
++	$U/_pingpong\
++	$U/_find\
+ 
+ 
+ ifeq ($(LAB),syscall)
+@@ -242,15 +245,8 @@ qemu-gdb: $K/kernel .gdbinit fs.img
+ 	@echo "*** Now run 'gdb' in another window." 1>&2
+ 	$(QEMU) $(QEMUOPTS) -S $(QEMUGDB)
+ 
+-GDBARGS = 
+-GDBARGS += -ex 'set architecture riscv:rv64'
+-GDBARGS += -ex 'target remote 127.0.0.1:$(GDBPORT)'
+-GDBARGS += -ex 'symbol-file kernel/kernel'
+-GDBARGS += -ex 'set riscv use-compressed-breakpoints yes'
+-
+-
+ gdb: 
+-	$(GDB) $(GDBARGS)
++	$(GDB)
+ 
+ ##
+ ##  FOR testing lab grading script
+diff --git a/commands.gdb b/commands.gdb
+new file mode 100644
+index 0000000..56f718a
+--- /dev/null
++++ b/commands.gdb
+@@ -0,0 +1,126 @@
++si
++si
++si
++si
++si
++si
++b * 0x80000086
++c
++u 58
++si
++u 29
++s
++n
++n
++n
++n
++n
++n
++n
++p p->name
++fin
++b main.c:42
++c
++s
++u 431
++n
++n
++si
++si
++si
++si
++si 10
++si 10
++si 10
++n
++n
++n
++n
++n
++s
++n
++u 112
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si 10
++si 10
++si 10
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si 10
++si 9
++si 10
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++u 40
++n
++n
++n
++n
++n
++n
++n
++n
++s
++s
++n
++p p->name
++u 112
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si
++si 10
++si 10
++si 10
++si
++si
++si
++si
++si
++si
++add-symbol-file user/_init
++da
++n
++n
++n
++n
++
+diff --git a/user/find.c b/user/find.c
+new file mode 100644
+index 0000000..4ac242b
+--- /dev/null
++++ b/user/find.c
+@@ -0,0 +1,82 @@
++#include "kernel/types.h"
++#include "kernel/stat.h"
++#include "user/user.h"
++#include "kernel/fs.h"
++
++char *fmtname(char *path) {
++
++  char *p;
++
++  // Find first character after last slash.
++  for (p = path + strlen(path); p >= path && *p != '/'; p--)
++    ;
++  p++;
++
++  // Return name.
++  return p;
++}
++
++void find(char * path,char *name){
++    char buf[512], *p; 
++    int fd;//文件描述符
++    struct dirent de;//一个struct dirent结构体，用来保存从目录文件中读取的目录项
++    struct stat st;//文件状态结构，存储文件的元数据，如文件类型
++
++    if ((fd = open(path, 0)) < 0) {
++    fprintf(2, "find: cannot open %s\n", path);
++    return;
++    }
++
++    if (fstat(fd, &st) < 0) {
++    fprintf(2, "find: cannot stat %s\n", path);
++    close(fd);
++    return;
++    }
++
++    switch (st.type) {
++    case T_FILE:
++      if(strcmp(fmtname(path),name)==0){
++        //printf("%s %d %d %l\n", fmtname(path), st.type, st.ino, st.size);
++        printf("%s",path);
++      }
++      break;
++
++    case T_DIR:
++      if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
++        printf("find: path too long\n");
++        break;
++      }
++      strcpy(buf, path);
++      p = buf + strlen(buf);
++      *p++ = '/';
++      while (read(fd, &de, sizeof(de)) == sizeof(de)) {
++        if (de.inum == 0) continue;
++        memmove(p, de.name, DIRSIZ);
++        p[DIRSIZ] = 0;
++
++        if (stat(buf, &st) < 0) {
++          printf("find: cannot stat %s\n", buf);
++          continue;
++        }
++
++        if(strcmp(fmtname(buf),name)==0){
++          //printf("%s %d %d %d\n", fmtname(buf), st.type, st.ino, st.size);
++          printf("%s\n",buf);
++        }
++        if(st.type==T_DIR&&strcmp(de.name,".")!=0&&strcmp(de.name,"..")!=0){
++          find(buf,name);
++        }
++
++      }
++      break;
++  }
++  close(fd);
++}
++
++int main(int argc,char* argv[]){
++  if (argc < 3) {
++    exit(0);
++  }
++  find(argv[1],argv[2]);
++  exit(0);
++}
+\ No newline at end of file
+diff --git a/user/pingpong.c b/user/pingpong.c
+new file mode 100644
+index 0000000..09adc81
+--- /dev/null
++++ b/user/pingpong.c
+@@ -0,0 +1,68 @@
++#include "kernel/types.h"
++#include "user.h"
++#include "kernel/fs.h"
++int main(int argc,char* argv[]){
++
++    int p[2],p1[2];
++    pipe(p);//定义第一个管道，用于父进程向子进程传送数据
++    pipe(p1);//定义第二个管道，用于子进程向父进程传送数据
++    int pid_child;
++    char buf[54];
++    if((pid_child=fork())<0){
++        exit(1);
++    }
++    else if(pid_child==0){
++        //子进程  p管道读，p1管道写
++        //p1管道传子进程id
++        close(p[1]);
++        close(p1[0]);  
++
++        //子进程先接收来自父进程的数据
++        int nbuf=read(p[0],buf,sizeof(buf)-1);
++         if (nbuf < 0) {
++            fprintf(2, "Error reading from pipe\n");
++            exit(1);
++        }
++        buf[nbuf]=0;
++        printf("%d: received ping from pid %d\n",getpid(),atoi(buf));
++
++        //再发送数据给父进程
++        itoa(getpid(),buf);
++        write(p1[1],buf,strlen(buf));
++        
++        close(p[0]);
++        close(p1[1]);
++        exit(0);
++       
++        
++
++    }
++    else{
++        //父进程 p管道写，p1管道读
++        //p管道传父进程id
++        close(p[0]);
++        close(p1[1]);
++
++        //父进程先发送消息给子进程
++        itoa(getpid(),buf);
++        write(p[1],buf,strlen(buf));
++
++
++        //从子进程中接收数据
++        int nbuf=read(p1[0],buf,sizeof(buf)-1);
++        if (nbuf < 0) {
++            fprintf(2, "Error reading from pipe\n");
++            exit(1);
++        }
++        buf[nbuf]=0;
++        printf("%d: received pong from pid %d\n",getpid(),atoi(buf));
++        
++        close(p[1]);
++        close(p1[0]);
++        
++        wait(0);
++        exit(0);
++        
++    }
++    exit(0);
++}
+\ No newline at end of file
+diff --git a/user/sleep.c b/user/sleep.c
+new file mode 100644
+index 0000000..fd8a7b6
+--- /dev/null
++++ b/user/sleep.c
+@@ -0,0 +1,12 @@
++#include "kernel/types.h"
++#include "user.h"
++int main(int argc,char* argv[]){
++    if(argc!=2){
++        printf("Sleep needs one argument!\n");
++        exit(-1);
++    }
++    int ticks=atoi(argv[1]);
++    sleep(ticks);
++    printf("(nothing happens for a little while)\n");
++    exit(0);
++}
+\ No newline at end of file
