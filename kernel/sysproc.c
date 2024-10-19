@@ -20,8 +20,9 @@ uint64 sys_fork(void) { return fork(); }
 
 uint64 sys_wait(void) {
   uint64 p;
-  if (argaddr(0, &p) < 0) return -1;
-  return wait(p);
+  int flags;
+  if (argaddr(0, &p) < 0||argint(1,&flags)<0) return -1;
+  return wait(p,flags);
 }
 
 uint64 sys_sbrk(void) {
@@ -80,4 +81,43 @@ uint64 sys_rename(void) {
   memmove(p->name, name, len);
   p->name[len] = '\0';
   return 0;
+}
+
+uint64 sys_yield(void){
+    struct proc *p=myproc();
+    printf("Save the context of the process to the memory region from address %p to %p\n",(void *)&p->context, 
+       (void *)((uint64)&p->context + sizeof(p->context)));
+    printf("Current running process pid is %d and user pc is 0x%x\n", p->pid, p->trapframe->epc);
+
+    int current_index = -1;  // 初始化为 -1，表示未找到
+
+    //proc 是进程表，NPROC 是进程表的大小
+    for (int i = 0; i < NPROC; i++) {
+        if (&proc[i] == myproc()) {  // 检查当前进程是否为 proc[i]
+          current_index = i;  // 找到当前进程的索引
+          break;  // 找到后提前退出循环
+        }
+    }
+
+    acquire(&p->lock);
+    int found = 0;
+    //环形遍历进程表
+    for (int i = 0; i < NPROC; i++) {
+      struct proc *pp = &proc[(current_index + i) % NPROC];
+     
+      if (pp->state == RUNNABLE && pp!=p) {
+        
+        printf("Next runnable process pid is %d and user pc is 0x%x\n",pp->pid, pp->trapframe->epc);
+        found = 1;
+       
+        break;
+      }
+    }
+    
+    if (found == 0) {
+      printf("No runnable process found!\n");
+    }
+    release(&p->lock);
+    yield();
+    return 0;
 }

@@ -267,11 +267,24 @@ int fork(void) {
   return pid;
 }
 
+const char* get_proc_state_string(enum procstate state) {
+    switch (state) {
+        case UNUSED:   return "unused";
+        case SLEEPING: return "sleep";
+        case RUNNABLE: return "runble";
+        case RUNNING:  return "run";
+        case ZOMBIE:   return "zombie";
+        default:       return "unknown";
+    }
+}
+// UNUSED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE
+
 // Pass p's abandoned children to init.
 // Caller must hold p->lock.
 void reparent(struct proc *p) {
   struct proc *pp;
 
+  int count=0;
   for (pp = proc; pp < &proc[NPROC]; pp++) {
     // this code uses pp->parent without holding pp->lock.
     // acquiring the lock first could cause a deadlock
@@ -287,6 +300,8 @@ void reparent(struct proc *p) {
       // the lock on one of init's children (pp). this is why
       // exit() always wakes init (before acquiring any locks).
       release(&pp->lock);
+      exit_info("proc %d exit, child %d, pid %d, name %s, state %s\n",p->pid,count,pp->pid,pp->name,get_proc_state_string(pp->state));
+      count++;
     }
   }
 }
@@ -339,8 +354,9 @@ void exit(int status) {
   acquire(&p->lock);
 
   // Give any children to init.
+  exit_info("proc %d exit, parent pid %d, name %s, state %s\n",p->pid,original_parent->pid,original_parent->name,get_proc_state_string(original_parent->state));
   reparent(p);
-
+  
   // Parent might be sleeping in wait().
   wakeup1(original_parent);
 
@@ -351,12 +367,13 @@ void exit(int status) {
 
   // Jump into the scheduler, never to return.
   sched();
+
   panic("zombie exit");
 }
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
-int wait(uint64 addr) {
+int wait(uint64 addr,int flags) {
   struct proc *np;
   int havekids, pid;
   struct proc *p = myproc();
@@ -401,7 +418,13 @@ int wait(uint64 addr) {
     }
 
     // Wait for a child to exit.
-    sleep(p, &p->lock);  // DOC: wait-sleep
+    if(!flags){
+      sleep(p, &p->lock);  // DOC: wait-sleep
+    }
+    else{
+      release(&p->lock);
+      return -1;
+    }
   }
 }
 
@@ -429,9 +452,9 @@ void scheduler(void) {
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
-        c->proc = p;
+        c->proc = p;   
         swtch(&c->context, &p->context);
-
+        
         // Process is done running for now.
         // It should have changed its p->state before coming back.
         c->proc = 0;
