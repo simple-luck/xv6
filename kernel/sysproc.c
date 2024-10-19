@@ -89,19 +89,18 @@ uint64 sys_yield(void){
        (void *)((uint64)&p->context + sizeof(p->context)));
     printf("Current running process pid is %d and user pc is 0x%x\n", p->pid, p->trapframe->epc);
 
-    int current_index = -1;  // ³õÊ¼»¯Îª -1£¬±íÊ¾Î´ÕÒµ½
-
-    //proc ÊÇ½ø³Ì±í£¬NPROC ÊÇ½ø³Ì±íµÄ´óĞ¡
+    int current_index = -1;  
+    //è·å–å½“å‰è¿›ç¨‹åœ¨è¿›ç¨‹è¡¨ä¸­çš„ç´¢å¼•
     for (int i = 0; i < NPROC; i++) {
-        if (&proc[i] == myproc()) {  // ¼ì²éµ±Ç°½ø³ÌÊÇ·ñÎª proc[i]
-          current_index = i;  // ÕÒµ½µ±Ç°½ø³ÌµÄË÷Òı
-          break;  // ÕÒµ½ºóÌáÇ°ÍË³öÑ­»·
+        if (&proc[i] == myproc()) {  
+          current_index = i; 
+          break;  
         }
     }
 
     acquire(&p->lock);
     int found = 0;
-    //»·ĞÎ±éÀú½ø³Ì±í
+    //ç¯å½¢éå†è¿›ç¨‹è¡¨
     for (int i = 0; i < NPROC; i++) {
       struct proc *pp = &proc[(current_index + i) % NPROC];
      
