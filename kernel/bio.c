@@ -32,7 +32,7 @@ struct {
   // Sorted by how recently the buffer was used.
   // head.next is most recent, head.prev is least.
   //struct buf head;
-  
+  struct spinlock glock;
   struct buf hashbucket[NBUCKETS]; //每个哈希队列一个linked list及一个lock
 } bcache;
 
@@ -48,6 +48,7 @@ binit(void)
     b->next=b;
     b->prev=b;
   }
+  initlock(&bcache.glock, "bcache_gloock");
   //printf("hello\n");
   // 初始化所有缓冲区并将它们添加到第一个哈希桶
   b=&bcache.hashbucket[0];
@@ -101,12 +102,14 @@ bget(uint dev, uint blockno)
       }
   }
   release(&bcache.lock[h]);
+  acquire(&bcache.glock);
   
   // Not cached.
   // Recycle the least recently used (LRU) unused buffer.
   for (uint i = 0; i < NBUCKETS; i++) {
     if(i==h)continue;
     acquire(&bcache.lock[i]);
+    
     head=&bcache.hashbucket[i];
     //printf("hello\n");
     for (b =bcache.hashbucket[i].next; b!=head; b = b->next) {
@@ -130,12 +133,15 @@ bget(uint dev, uint blockno)
         head->next=b;
 
         release(&bcache.lock[h]);
+        release(&bcache.glock);
         acquiresleep(&b->lock);
         return b;
       }
     }
+    //printf("hello\n");
     release(&bcache.lock[i]);  
   }
+  release(&bcache.glock);
   panic("bget: no buffers");
   
 }
